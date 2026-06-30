@@ -56,7 +56,7 @@ client = genai.Client()
 
 @app.route('/')
 def serve_index():
-    return send_from_directory('public', 'index.html')
+    return app.send_static_file('index.html')
 
 @app.route('/api/generate-questions', methods=['POST'])
 def generate_questions():
