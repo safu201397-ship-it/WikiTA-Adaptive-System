@@ -58,17 +58,51 @@ client = genai.Client()
 def serve_index():
     return app.send_static_file('index.html')
 
+import PyPDF2
+
 @app.route('/api/generate-questions', methods=['POST'])
 def generate_questions():
-    data = request.json
-    concept = data.get('concept', 'Python 基礎')
-    tier = data.get('tier', 'Remember')
-    count = data.get('count', 1)
+    # 支援 JSON (舊版) 或 FormData (新版)
+    if request.is_json:
+        data = request.json
+        concept = data.get('concept', 'Python 基礎')
+        tier = data.get('tier', 'Remember')
+        count = data.get('count', 1)
+        pdf_text = ""
+    else:
+        concept = request.form.get('concept', 'Python 基礎')
+        tier = request.form.get('tier', 'Remember')
+        count = request.form.get('count', 1)
+        pdf_text = ""
+        
+        if 'file' in request.files:
+            file = request.files['file']
+            if file and file.filename.endswith('.pdf'):
+                try:
+                    pdf_reader = PyPDF2.PdfReader(file)
+                    for page in pdf_reader.pages:
+                        pdf_text += page.extract_text() + "\n"
+                except Exception as e:
+                    print(f"Error reading PDF: {e}")
     
-    prompt = f"""
-    身為一個資深的大學程式設計課程助教，請針對概念「{concept}」以及 Bloom's Taxonomy 的難度層級「{tier}」，
-    設計 {count} 道優質的單選題（包含題目、4個選項、正確解答、詳解）。
-    
+    # 組合 Prompt
+    if pdf_text.strip():
+        prompt = f"""
+        身為一個資深的大學程式設計課程助教，請根據以下提供的「教材內容」，
+        針對概念「{concept}」以及 Bloom's Taxonomy 的難度層級「{tier}」，
+        設計 {count} 道優質的單選題（包含題目、4個選項、正確解答、詳解）。
+        
+        【教材內容開始】
+        {pdf_text[:30000]}  # 限制字數避免超過 token 限制
+        【教材內容結束】
+        """
+    else:
+        prompt = f"""
+        身為一個資深的大學程式設計課程助教，請針對概念「{concept}」以及 Bloom's Taxonomy 的難度層級「{tier}」，
+        設計 {count} 道優質的單選題（包含題目、4個選項、正確解答、詳解）。
+        """
+        
+    prompt += f"""
     請務必以 JSON 陣列格式輸出，格式要求如下：
     [
         {{
