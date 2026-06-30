@@ -308,10 +308,20 @@ document.addEventListener('DOMContentLoaded', () => {
         genBtn.disabled = true;
 
         try {
+            const fileInput = document.getElementById('gen-file');
+            const file = fileInput.files[0];
+            
+            const formData = new FormData();
+            formData.append('concept', currentConcept);
+            formData.append('tier', currentTier);
+            formData.append('count', count);
+            if (file) {
+                formData.append('file', file);
+            }
+
             const response = await fetch('/api/generate-questions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ concept: currentConcept, tier: currentTier, count: count })
+                body: formData // 不需指定 Content-Type，瀏覽器會自動加上 multipart/form-data 和 boundary
             });
             
             const data = await response.json();

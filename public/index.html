@@ -85,8 +85,9 @@
                         <h3>AI 命題與題庫管理</h3>
                         <div class="generator-controls">
                             <div class="form-group">
-                                <label>概念 (Concept)</label>
-                                <input type="text" id="gen-concept" class="form-control" placeholder="請輸入您想出題的知識點，例如：光合作用、文藝復興..." style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+                                <label>概念 (Concept) <span style="font-size: 0.8em; color: var(--text-secondary); font-weight: normal;">(選擇性：也可上傳教材由 AI 閱讀)</span></label>
+                                <input type="text" id="gen-concept" class="form-control" placeholder="請輸入您想出題的知識點，例如：光合作用、文藝復興..." style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); margin-bottom: 8px;">
+                                <input type="file" id="gen-file" accept=".pdf" class="form-control" style="width: 100%; padding: 6px; border: 1px dashed var(--border-color); border-radius: 4px; background: rgba(255,255,255,0.02); color: var(--text-secondary); font-size: 0.9em;">
                             </div>
                             <div class="form-group">
                                 <label>難度 (Bloom's Tier)</label>
