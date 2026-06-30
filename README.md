@@ -53,7 +53,34 @@ python app.py
 ---
 
 ## 🛠️ 技術棧 (Tech Stack)
-- **前端 (Frontend)**: Vanilla HTML5 / CSS3 / JavaScript
-- **後端 (Backend)**: Python / Flask
-- **資料庫 (Database)**: SQLite
 - **AI 引擎 (AI Engine)**: Google Gemini API
+
+---
+
+## ☁️ 雲端部署至 Render (Cloud Deployment)
+
+本專案支援一鍵部署至 [Render.com](https://render.com/)，並搭配 Render 免費提供的 PostgreSQL 資料庫，解決免費主機休眠會刪除資料的問題。
+
+### 部署步驟：
+1. **建立資料庫 (PostgreSQL)**：
+   - 登入 Render，點擊 `New` -> `PostgreSQL`。
+   - 名稱隨意填寫，選擇 `Free` 方案，點擊 `Create Database`。
+   - 建立完成後，往下滑找到 **`Internal Database URL`**，將這串網址複製下來。
+2. **部署應用程式 (Web Service)**：
+   - 點擊 `New` -> `Web Service`。
+   - 選擇綁定您的 GitHub，並選擇這個專案 (WikiTA-Adaptive-System)。
+   - **Environment (環境)**：選擇 `Python 3`
+   - **Build Command (建置指令)**：`pip install -r requirements.txt`
+   - **Start Command (啟動指令)**：`gunicorn app:app`
+   - 方案選擇 `Free`。
+3. **設定環境變數 (Environment Variables)**：
+   - 在部署頁面展開 `Advanced` 區塊，點擊 `Add Environment Variable`。
+   - 新增第一個變數：
+     - **Key**: `DATABASE_URL`
+     - **Value**: `(剛剛複製的 Internal Database URL)`
+   - 新增第二個變數：
+     - **Key**: `GEMINI_API_KEY`
+     - **Value**: `(您的 Gemini API 金鑰)`
+4. 點擊 **`Create Web Service`**！
+
+大約等待 3~5 分鐘，您的專案就會在雲端正式上線，並且擁有永久儲存題目的 PostgreSQL 資料庫了！

@@ -1,7 +1,8 @@
 import os
 import json
-import sqlite3
 from flask import Flask, request, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql.expression import func
 from dotenv import load_dotenv
 from google import genai
 
@@ -9,28 +10,46 @@ from google import genai
 load_dotenv()
 
 app = Flask(__name__, static_folder='public', static_url_path='')
-DB_FILE = 'questions.db'
+
+# 設定資料庫連線 (自動適應本地 SQLite 或 Render PostgreSQL)
+# Render 會在環境變數提供 DATABASE_URL (例如 postgres://...)
+# 如果沒有，預設使用本地端的 sqlite:///quiz.db
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///quiz.db')
+if db_url.startswith('postgres://'):
+    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# 定義資料庫模型
+class Question(db.Model):
+    __tablename__ = 'questions'
+    id = db.Column(db.Integer, primary_key=True)
+    concept = db.Column(db.String(255), nullable=False)
+    tier = db.Column(db.String(50), nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    options = db.Column(db.Text, nullable=False) # 儲存 JSON string
+    answer = db.Column(db.Integer, nullable=False)
+    explanation = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'concept': self.concept,
+            'tier': self.tier,
+            'question': self.question,
+            'options': json.loads(self.options),
+            'answer': self.answer,
+            'explanation': self.explanation,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 # 初始化資料庫
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            concept TEXT NOT NULL,
-            tier TEXT NOT NULL,
-            question TEXT NOT NULL,
-            options TEXT NOT NULL,
-            answer INTEGER NOT NULL,
-            explanation TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
+with app.app_context():
+    db.create_all()
 
 # 初始化 Gemini 客戶端
 client = genai.Client()
@@ -81,7 +100,6 @@ def generate_questions():
         
     except Exception as e:
         print(f"Error generating questions: {e}")
-        # MVP Fallback: 如果遇到 Quota 限制或 503，直接回傳寫死的假題目讓 UI 流程可以走下去
         fallback_question = {
             "question": f"【模擬產題】關於「{concept}」在難度「{tier}」的考題。下列哪一個選項是正確的？",
             "options": [
@@ -99,23 +117,19 @@ def generate_questions():
 def save_question():
     data = request.json
     try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO questions (concept, tier, question, options, answer, explanation)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            data['concept'],
-            data['tier'],
-            data['question'],
-            json.dumps(data['options']),
-            data['answer'],
-            data['explanation']
-        ))
-        conn.commit()
-        conn.close()
+        new_q = Question(
+            concept=data['concept'],
+            tier=data['tier'],
+            question=data['question'],
+            options=json.dumps(data['options']),
+            answer=data['answer'],
+            explanation=data['explanation']
+        )
+        db.session.add(new_q)
+        db.session.commit()
         return jsonify({"success": True, "message": "儲存成功！"})
     except Exception as e:
+        db.session.rollback()
         print(f"Error saving question: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -124,49 +138,28 @@ def save_questions_bulk():
     data = request.json
     questions = data.get('questions', [])
     try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        
-        insert_data = []
-        for q in questions:
-            insert_data.append((
-                q['concept'],
-                q['tier'],
-                q['question'],
-                json.dumps(q['options']),
-                q['answer'],
-                q['explanation']
-            ))
-            
-        c.executemany('''
-            INSERT INTO questions (concept, tier, question, options, answer, explanation)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', insert_data)
-        
-        conn.commit()
-        conn.close()
-        return jsonify({"success": True, "message": f"成功儲存 {len(insert_data)} 題！"})
+        for q_data in questions:
+            new_q = Question(
+                concept=q_data['concept'],
+                tier=q_data['tier'],
+                question=q_data['question'],
+                options=json.dumps(q_data['options']),
+                answer=q_data['answer'],
+                explanation=q_data['explanation']
+            )
+            db.session.add(new_q)
+        db.session.commit()
+        return jsonify({"success": True, "message": f"成功儲存 {len(questions)} 題！"})
     except Exception as e:
+        db.session.rollback()
         print(f"Error saving questions bulk: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/questions', methods=['GET'])
 def get_questions():
     try:
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute('SELECT * FROM questions ORDER BY created_at DESC')
-        rows = c.fetchall()
-        conn.close()
-        
-        questions = []
-        for row in rows:
-            q = dict(row)
-            q['options'] = json.loads(q['options'])
-            questions.append(q)
-            
-        return jsonify({"success": True, "data": questions})
+        questions = Question.query.order_by(Question.created_at.desc()).all()
+        return jsonify({"success": True, "data": [q.to_dict() for q in questions]})
     except Exception as e:
         print(f"Error getting questions: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -175,36 +168,35 @@ def get_questions():
 def update_question(q_id):
     data = request.json
     try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute('''
-            UPDATE questions 
-            SET question = ?, options = ?, answer = ?, explanation = ?
-            WHERE id = ?
-        ''', (
-            data.get('question'),
-            json.dumps(data.get('options')),
-            data.get('answer'),
-            data.get('explanation'),
-            q_id
-        ))
-        conn.commit()
-        conn.close()
+        q = Question.query.get(q_id)
+        if not q:
+            return jsonify({"success": False, "error": "Question not found"}), 404
+            
+        q.question = data.get('question', q.question)
+        if 'options' in data:
+            q.options = json.dumps(data.get('options'))
+        q.answer = data.get('answer', q.answer)
+        q.explanation = data.get('explanation', q.explanation)
+        
+        db.session.commit()
         return jsonify({"success": True, "message": "題目更新成功"})
     except Exception as e:
+        db.session.rollback()
         print(f"Error updating question: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/questions/<int:q_id>', methods=['DELETE'])
 def delete_question(q_id):
     try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute('DELETE FROM questions WHERE id = ?', (q_id,))
-        conn.commit()
-        conn.close()
+        q = Question.query.get(q_id)
+        if not q:
+            return jsonify({"success": False, "error": "Question not found"}), 404
+            
+        db.session.delete(q)
+        db.session.commit()
         return jsonify({"success": True, "message": "題目刪除成功"})
     except Exception as e:
+        db.session.rollback()
         print(f"Error deleting question: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -215,14 +207,11 @@ def batch_delete_questions():
     if not ids:
         return jsonify({"success": False, "error": "未提供任何 ID"}), 400
     try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        placeholders = ','.join('?' * len(ids))
-        c.execute(f'DELETE FROM questions WHERE id IN ({placeholders})', tuple(ids))
-        conn.commit()
-        conn.close()
+        Question.query.filter(Question.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
         return jsonify({"success": True, "message": f"成功刪除 {len(ids)} 題"})
     except Exception as e:
+        db.session.rollback()
         print(f"Error batch deleting questions: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -230,25 +219,11 @@ def batch_delete_questions():
 def get_task_questions():
     try:
         count = int(request.args.get('count', 5))
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute('SELECT * FROM questions ORDER BY RANDOM() LIMIT ?', (count,))
-        rows = c.fetchall()
-        conn.close()
-        
-        questions = []
-        for row in rows:
-            q = dict(row)
-            q['options'] = json.loads(q['options'])
-            questions.append(q)
-            
-        return jsonify({"success": True, "data": questions})
+        questions = Question.query.order_by(func.random()).limit(count).all()
+        return jsonify({"success": True, "data": [q.to_dict() for q in questions]})
     except Exception as e:
         print(f"Error getting task questions: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 3000))
-    print(f"Server starting on http://localhost:{port}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(debug=True, host='0.0.0.0')
