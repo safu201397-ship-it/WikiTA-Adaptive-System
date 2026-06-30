@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI助教 【實驗室大師兄】 MVP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Navigation -->
+        <nav class="navbar">
+            <div class="logo">
+                <span class="icon">🤖</span>
+                <h1>實驗室大師兄 <span class="subtitle">WikiTA</span></h1>
+            </div>
+            <div class="nav-controls">
+                <button id="view-toggle" class="btn primary">切換至教師端 (Teacher View)</button>
+                <div class="user-profile">pi xxy</div>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            
+            <!-- STUDENT VIEW -->
+            <section id="student-view" class="view active">
+                <header class="view-header">
+                    <h2>我的學習任務</h2>
+                    <p>AI 帶你跑一輪 Probe -> Deepen -> Reassess 的適性循環</p>
+                </header>
+
+                <!-- Current Task -->
+                <div class="card task-card">
+                    <h3>綜合適性測驗 (Comprehensive Adaptive Quiz)</h3>
+                    <p class="subtitle">根據您的程度，AI 動態派發最適合的題目。涵蓋題庫中的多重知識點。</p>
+                    
+                    <div style="margin-top: 15px;">
+                            <div class="mastery-label">掌握度: <span class="status developing">發展中</span></div>
+                            <div class="progress-bar"><div class="fill" style="width: 40%;"></div></div>
+                        </div>
+                        <button class="btn secondary start-quiz" data-topic="python">進入任務</button>
+                    </div>
+
+                <!-- Quiz Area (Hidden by default) -->
+                <div id="quiz-area" class="card quiz-card hidden">
+                    <div class="quiz-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="badge" id="quiz-progress-badge">STEP 1: Probe (快速掃描)</span>
+                            <span class="badge" id="quiz-difficulty-badge" style="background: rgba(245, 158, 11, 0.2); color: var(--warning-color); margin-left: 10px; display: none;">難度：⭐️</span>
+                        </div>
+                        <button class="btn text-only close-quiz">離開測驗</button>
+                    </div>
+                    <div id="quiz-content" class="quiz-content">
+                        <!-- Questions injected here via JS -->
+                        <div class="loading-spinner">載入中...</div>
+                    </div>
+                    <div id="quiz-actions" class="hidden" style="margin-top: 15px; text-align: right;">
+                        <button id="btn-next-question" class="btn primary">下一題 ⏭️</button>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TEACHER VIEW -->
+            <section id="teacher-view" class="view hidden">
+                <header class="view-header">
+                    <h2>教師儀表板</h2>
+                    <p>即時掌握全班、精準介入個人，AI 自動命題審核。</p>
+                </header>
+
+                <div class="teacher-grid">
+                    
+                    <!-- Feature 1: Heatmap -->
+                    <div class="card heatmap-card">
+                        <h3>掌握度熱圖 (Class Heatmap)</h3>
+                        <p class="subtitle">點擊格子可進行個人化介入 (PI)</p>
+                        <div class="heatmap-container" id="heatmap-container">
+                            <!-- Heatmap injected via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Feature 2: AI Question Generator -->
+                    <div class="card generator-card">
+                        <h3>AI 命題與題庫管理</h3>
+                        <div class="generator-controls">
+                            <div class="form-group">
+                                <label>概念 (Concept)</label>
+                                <input type="text" id="gen-concept" class="form-control" placeholder="請輸入您想出題的知識點，例如：光合作用、文藝復興..." style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+                            </div>
+                            <div class="form-group">
+                                <label>難度 (Bloom's Tier)</label>
+                                <select id="gen-tier">
+                                    <option value="Remember">1 - Remember (記憶)</option>
+                                    <option value="Understand">2 - Understand (理解)</option>
+                                    <option value="Apply">3 - Apply (應用)</option>
+                                    <option value="Analyze">4 - Analyze (分析)</option>
+                                    <option value="Evaluate">5 - Evaluate (評鑑)</option>
+                                    <option value="Create">6 - Create (創造)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>產出題數 (Count)</label>
+                                <input type="number" id="gen-count" min="1" max="50" value="5" class="form-control" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+                            </div>
+                            <button id="btn-generate" class="btn primary gen-btn">✨ AI 批次產出 Draft 題目</button>
+                        </div>
+                        
+                        <div id="gen-results" class="gen-results" style="max-height: 500px; overflow-y: auto;">
+                            <!-- Generated questions injected here -->
+                            <div class="empty-state">指定概念、難度與數量，AI 幫你海量出題。</div>
+                        </div>
+                        <div id="save-action-area" class="hidden" style="margin-top: 15px; text-align: right;">
+                            <button id="btn-save-question" class="btn success" style="background: var(--success-color); color: white;">✅ 將這批題目全部儲存至題庫</button>
+                        </div>
+                    </div>
+                </div>
+
+                    <!-- Feature 3: Question Bank -->
+                <div class="card bank-card" style="margin-top: 25px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h3>我的題庫總覽 (Question Bank)</h3>
+                            <p class="subtitle">所有已審核通過的 AI 題目</p>
+                        </div>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <!-- 分類篩選器 -->
+                            <div style="background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;">
+                                <label style="margin:0; font-size: 0.9rem; white-space: nowrap;">概念篩選：</label>
+                                <select id="bank-filter-concept" class="form-control" style="padding: 4px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+                                    <option value="ALL" style="color: #000; background: #fff;">顯示全部</option>
+                                    <!-- Options injected via JS -->
+                                </select>
+                            </div>
+                            
+                            <!-- 難度篩選器 -->
+                            <div style="background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;">
+                                <label style="margin:0; font-size: 0.9rem; white-space: nowrap;">難度篩選：</label>
+                                <select id="bank-filter-tier" class="form-control" style="padding: 4px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+                                    <option value="ALL" style="color: #000; background: #fff;">顯示全部</option>
+                                    <option value="Remember" style="color: #000; background: #fff;">⭐️ Remember (記憶)</option>
+                                    <option value="Understand" style="color: #000; background: #fff;">⭐️⭐️ Understand (理解)</option>
+                                    <option value="Apply" style="color: #000; background: #fff;">⭐️⭐️⭐️ Apply (應用)</option>
+                                    <option value="Analyze" style="color: #000; background: #fff;">⭐️⭐️⭐️⭐️ Analyze (分析)</option>
+                                    <option value="Evaluate" style="color: #000; background: #fff;">⭐️⭐️⭐️⭐️⭐️ Evaluate (評鑑)</option>
+                                    <option value="Create" style="color: #000; background: #fff;">⭐️⭐️⭐️⭐️⭐️⭐️ Create (創造)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 批量刪除按鈕 -->
+                            <div style="display: flex; align-items: center;">
+                                <button id="btn-batch-delete" class="btn danger hidden" style="padding: 10px 15px;">🗑️ 批量刪除 (0)</button>
+                            </div>
+                            
+                            <!-- 任務派發設定 -->
+                            <div style="background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;">
+                                <label style="margin:0; font-size: 0.9rem; white-space: nowrap;">派發給學生的題數：</label>
+                                <input type="number" id="task-question-count" min="1" max="50" value="5" class="form-control" style="width: 60px; padding: 4px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); text-align: center;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="bank-container" style="display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start;">
+                        <div id="bank-list">
+                            <div class="empty-state">目前題庫空空如也，快去產題並儲存吧！</div>
+                        </div>
+                        <div id="bank-sidebar" style="position: sticky; top: 20px; background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); max-height: 70vh; overflow-y: auto; display: none;">
+                            <h4 style="margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); color: var(--accent-color);">題目總表導覽</h4>
+                            <ul id="bank-toc" style="list-style: none; padding: 0; margin: 10px 0 0 0; font-size: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
+                                <!-- TOC items injected via JS -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Intervention Modal -->
+                <div id="intervention-modal" class="modal hidden">
+                    <div class="modal-content card">
+                        <div class="modal-header">
+                            <h3>難度調整 (Intervention)</h3>
+                            <button class="btn text-only close-modal">✕</button>
+                        </div>
+                        <div class="modal-body" id="modal-body-content">
+                            <!-- Injected -->
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn adjust-btn" data-action="soften">🔽 降低要求 (Soften)</button>
+                            <button class="btn adjust-btn" data-action="accept">⏭️ 直接跳級 (Accept)</button>
+                            <button class="btn adjust-btn" data-action="restart">🔄 重來 (Restart)</button>
+                            <button class="btn adjust-btn" data-action="stretch">🔼 拉高挑戰 (Stretch)</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <script src="app.js?v=2"></script>
+</body>
+</html>
